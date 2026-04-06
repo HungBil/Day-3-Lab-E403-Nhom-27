@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Voyanta Agent Chat</title>
+    <title>Voyanta - Trợ Lý Du Lịch</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -30,17 +30,18 @@
         <section class="chat-shell" aria-label="Travel planner chat">
             <div class="chat-header">
                 <div>
-                    <p class="eyebrow">Travel Planner Agent</p>
-                    <h1>Chat With Voyanta</h1>
+                    <p class="eyebrow">Trợ Lý Du Lịch Thông Minh</p>
+                    <h1>Chat Với Voyanta</h1>
                 </div>
-                <a class="btn btn-secondary" href="index.html">Back to Landing</a>
+                <a class="btn btn-secondary" href="index.html">Trang Chủ</a>
             </div>
 
             <div class="chat-window" id="chat-window" role="log" aria-live="polite">
                 <article class="bubble bubble-agent">
                     <p>
-                        Hi! I am your travel planner agent. Tell me destination, budget, trip length, and your
-                        interests. I can help estimate hotel, food, attractions, and budget fit.
+                        Xin chào! Tôi là trợ lý du lịch Voyanta. Hãy cho tôi biết điểm đến, ngân sách,
+                        thời gian chuyến đi và sở thích của bạn. Tôi có thể giúp ước tính khách sạn,
+                        ăn uống, điểm tham quan và kiểm tra ngân sách!
                     </p>
                 </article>
             </div>
@@ -48,9 +49,9 @@
             <form class="chat-input-area" id="chat-form" action="#" method="get">
                 <label for="trip-message" class="sr-only">Message</label>
                 <input id="trip-message" name="message" type="text"
-                    placeholder="Example: 2 days in Hoi An, budget 2 million, culture focus"
+                    placeholder="VD: Đi Đà Nẵng 3 ngày, ngân sách 5 triệu, thích biển"
                     aria-label="Type your trip request" autocomplete="off" />
-                <button class="btn btn-primary" type="submit" id="send-btn">Send</button>
+                <button class="btn btn-primary" type="submit" id="send-btn">Gửi</button>
             </form>
         </section>
     </main>
@@ -84,12 +85,12 @@
             if (!traces || traces.length === 0) return;
             const article = document.createElement("article");
             article.className = "bubble bubble-trace";
-            let html = '<details><summary>🔍 Agent Reasoning Trace (' + traces.length + ' steps)</summary><ol>';
+            let html = '<details><summary>🔍 Quá Trình Suy Luận (' + traces.length + ' bước)</summary><ol>';
             traces.forEach(t => {
                 html += '<li>';
-                if (t.thought) html += '<em>Thought:</em> ' + t.thought.replace(/\n/g, '<br>') + '<br>';
-                if (t.action) html += '<strong>Action:</strong> ' + t.action + '<br>';
-                if (t.observation) html += '<span style="color:#6c757d">Observation:</span> ' + t.observation.replace(/\n/g, '<br>');
+                if (t.thought) html += '<em>Suy nghĩ:</em> ' + t.thought.replace(/\n/g, '<br>') + '<br>';
+                if (t.action) html += '<strong>Hành động:</strong> ' + t.action + '<br>';
+                if (t.observation) html += '<span style="color:#6c757d">Kết quả:</span> ' + t.observation.replace(/\n/g, '<br>');
                 html += '</li>';
             });
             html += '</ol></details>';
@@ -100,7 +101,7 @@
 
         function setLoading(loading) {
             sendBtn.disabled = loading;
-            sendBtn.textContent = loading ? "Thinking..." : "Send";
+            sendBtn.textContent = loading ? "Đang suy nghĩ..." : "Gửi";
             messageInput.disabled = loading;
         }
 
@@ -115,7 +116,7 @@
             setLoading(true);
 
             // Show typing indicator
-            const typingBubble = addBubble("Thinking... 🤔", "agent typing");
+            const typingBubble = addBubble("Đang suy nghĩ... 🤔", "agent typing");
 
             try {
                 const response = await fetch(API_URL, {
@@ -139,7 +140,7 @@
                 }
             } catch (err) {
                 typingBubble.remove();
-                addBubble("❌ Could not connect to server. Make sure backend is running on port 8000.", "agent");
+                addBubble("❌ Không thể kết nối server. Hãy chắc chắn backend đang chạy trên port 8000.", "agent");
             }
 
             setLoading(false);

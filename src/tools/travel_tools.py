@@ -98,10 +98,40 @@ ATTRACTIONS: Dict[Tuple[str, str], List[str]] = {
         "Fish sauce factory visit (free)",
     ],
 }
+import unicodedata
+import re as _re
+
+# Vietnamese → ASCII mappings for city names
+_VIET_CITY_MAP = {
+    "đà nẵng": "da nang",
+    "da nang": "da nang",
+    "phú quốc": "phu quoc",
+    "phu quoc": "phu quoc",
+    "sa pa": "sapa",
+    "sapa": "sapa",
+    "hội an": "hoi an",
+    "hoi an": "hoi an",
+    "nha trang": "nha trang",
+    "đà lạt": "da lat",
+    "da lat": "da lat",
+    "hạ long": "ha long",
+    "ha long": "ha long",
+}
 
 
 def _normalize_city(city: str) -> str:
-    return city.strip().lower()
+    raw = city.strip().lower()
+    # Try direct match first
+    if raw in _VIET_CITY_MAP:
+        return _VIET_CITY_MAP[raw]
+    # Fallback: strip Unicode diacritics
+    nfkd = unicodedata.normalize("NFKD", raw)
+    ascii_name = "".join(c for c in nfkd if not unicodedata.combining(c))
+    ascii_name = ascii_name.replace("đ", "d").replace("Đ", "D")
+    ascii_name = _re.sub(r"\s+", " ", ascii_name).strip()
+    if ascii_name in _VIET_CITY_MAP:
+        return _VIET_CITY_MAP[ascii_name]
+    return ascii_name
 
 
 def search_destination(city: str) -> str:
@@ -179,9 +209,20 @@ def search_attraction(city: str, interest: str) -> str:
 
 def check_budget(total_cost: str, budget: str) -> str:
     """Input: total_cost (string), budget (string). Output: budget status and recommendation."""
+    def _safe_parse_number(s: str) -> int:
+        cleaned = s.replace(",", "").strip()
+        # Handle simple math expressions like "1500000 + 900000 + 1400000"
+        if any(op in cleaned for op in ["+", "-", "*"]):
+            try:
+                result = eval(cleaned, {"__builtins__": {}}, {})  # safe: no builtins
+                return int(result)
+            except Exception:
+                pass
+        return int(cleaned)
+
     try:
-        total = int(total_cost.replace(",", "").strip())
-        cap = int(budget.replace(",", "").strip())
+        total = _safe_parse_number(total_cost)
+        cap = _safe_parse_number(budget)
     except ValueError:
         return "Invalid number format for total_cost or budget."
 

@@ -46,12 +46,12 @@ def _create_llm():
 # Initialize LLM and Agent once at startup
 print("Initializing LLM provider...")
 llm = _create_llm()
-agent = ReActAgent(llm=llm, max_steps=7)
+agent = ReActAgent(llm=llm, max_steps=10)
 print(f"Ready! Provider: {os.getenv('DEFAULT_PROVIDER', 'google')}, Model: {llm.model_name}")
 
 
 # Frontend directory for serving static files
-FE_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+FE_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 
 class TravelPlannerHandler(SimpleHTTPRequestHandler):
