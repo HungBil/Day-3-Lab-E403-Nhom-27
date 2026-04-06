@@ -81,7 +81,7 @@ class TravelPlannerHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def _handle_chat(self):
-        """POST /api/chat — Run the ReAct agent on user message."""
+        """POST /api/chat — Run agent or chatbot based on mode parameter."""
         try:
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
@@ -91,43 +91,78 @@ class TravelPlannerHandler(SimpleHTTPRequestHandler):
             return
 
         message = data.get("message", "").strip()
+        mode = data.get("mode", "agent").strip().lower()
         if not message:
             self._json_response({"error": "Empty message"}, status=400)
             return
 
-        logger.log_event("API_REQUEST", {"message": message})
+        logger.log_event("API_REQUEST", {"message": message, "mode": mode})
 
         try:
-            result = agent.run(message)
+            if mode == "chatbot":
+                result = self._run_chatbot(message)
+            else:
+                result = self._run_agent(message)
 
-            # Format traces for FE
-            fe_traces = []
-            for t in result.get("traces", []):
-                fe_traces.append({
-                    "step": t["step"],
-                    "thought": t.get("thought", ""),
-                    "action": t.get("action", ""),
-                    "observation": t.get("observation", ""),
-                })
-
-            response = {
-                "reply": result["answer"],
-                "steps": result["steps"],
-                "status": result["status"],
-                "traces": fe_traces,
-            }
-
-            logger.log_event("API_RESPONSE", {
-                "status": result["status"],
-                "steps": result["steps"],
-                "answer_preview": result["answer"][:100],
-            })
-
-            self._json_response(response)
+            self._json_response(result)
 
         except Exception as exc:
             logger.log_event("API_ERROR", {"error": str(exc)})
             self._json_response({"error": str(exc)}, status=500)
+
+    def _run_chatbot(self, message: str) -> dict:
+        """Chatbot baseline: send directly to LLM, no tools."""
+        import time
+        system = (
+            "Bạn là Voyanta, trợ lý du lịch Việt Nam. "
+            "Trả lời bằng tiếng Việt. Chỉ hỗ trợ về du lịch. "
+            "Nếu câu hỏi không liên quan du lịch, từ chối lịch sự và gợi ý hỏi về du lịch."
+        )
+        start = time.time()
+        llm_result = llm.generate(message, system_prompt=system)
+        latency = int((time.time() - start) * 1000)
+
+        reply = llm_result.get("content", "")
+        logger.log_event("CHATBOT_RESPONSE", {
+            "latency_ms": latency,
+            "tokens": llm_result.get("usage", {}).get("total_tokens", 0),
+            "answer_preview": reply[:100],
+        })
+
+        return {
+            "reply": reply,
+            "steps": 1,
+            "status": "success",
+            "traces": [],
+            "mode": "chatbot",
+        }
+
+    def _run_agent(self, message: str) -> dict:
+        """ReAct Agent mode with tools and reasoning traces."""
+        result = agent.run(message)
+
+        fe_traces = []
+        for t in result.get("traces", []):
+            fe_traces.append({
+                "step": t["step"],
+                "thought": t.get("thought", ""),
+                "action": t.get("action", ""),
+                "observation": t.get("observation", ""),
+            })
+
+        logger.log_event("API_RESPONSE", {
+            "status": result["status"],
+            "steps": result["steps"],
+            "answer_preview": result["answer"][:100],
+        })
+
+        return {
+            "reply": result["answer"],
+            "steps": result["steps"],
+            "status": result["status"],
+            "traces": fe_traces,
+            "mode": "agent",
+        }
 
     def _handle_metrics(self):
         """POST /api/metrics — Return session metrics."""

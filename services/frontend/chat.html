@@ -11,6 +11,117 @@
         href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap"
         rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <style>
+        /* ── Segmented Mode Selector ── */
+        .mode-selector {
+            position: relative;
+            display: inline-flex;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 14px;
+            padding: 4px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .mode-selector .slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            height: calc(100% - 8px);
+            width: calc(50% - 4px);
+            border-radius: 11px;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.1, 1), background 0.35s, box-shadow 0.35s;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .mode-selector.chatbot-active .slider {
+            transform: translateX(0);
+            background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+            box-shadow: 0 0 16px rgba(99,102,241,0.4), 0 2px 8px rgba(99,102,241,0.3);
+        }
+        .mode-selector.agent-active .slider {
+            transform: translateX(100%);
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            box-shadow: 0 0 16px rgba(16,185,129,0.4), 0 2px 8px rgba(16,185,129,0.3);
+        }
+        .mode-btn {
+            position: relative;
+            z-index: 1;
+            padding: 8px 18px;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.3s, transform 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            border-radius: 11px;
+        }
+        .mode-btn:hover { color: #cbd5e1; }
+        .mode-btn:active { transform: scale(0.96); }
+        .mode-btn.active {
+            color: #fff;
+            font-weight: 700;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        .mode-btn .icon {
+            font-size: 1.05rem;
+            line-height: 1;
+        }
+        /* Pulse on switch */
+        @keyframes mode-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+        .mode-selector.just-switched {
+            animation: mode-pulse 0.35s ease;
+        }
+
+        /* ── Mode badge on messages ── */
+        .mode-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            padding: 3px 10px;
+            border-radius: 999px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .mode-badge.agent {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(16,185,129,0.25);
+        }
+        .mode-badge.chatbot {
+            background: linear-gradient(135deg, #6366f1, #818cf8);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.25);
+        }
+
+        /* ── Header layout ── */
+        .chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .chat-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+    </style>
 </head>
 
 <body>
@@ -33,11 +144,23 @@
                     <p class="eyebrow">Trợ Lý Du Lịch Thông Minh</p>
                     <h1>Chat Với Voyanta</h1>
                 </div>
-                <a class="btn btn-secondary" href="index.html">Trang Chủ</a>
+                <div class="chat-header-actions">
+                    <div class="mode-selector agent-active" id="mode-selector" role="radiogroup" aria-label="Chat mode">
+                        <div class="slider"></div>
+                        <button class="mode-btn" id="btn-chatbot" role="radio" aria-checked="false" data-mode="chatbot">
+                            <span class="icon">💬</span> Chatbot
+                        </button>
+                        <button class="mode-btn active" id="btn-agent" role="radio" aria-checked="true" data-mode="agent">
+                            <span class="icon">🤖</span> Agent
+                        </button>
+                    </div>
+                    <a class="btn btn-secondary" href="index.html">Trang Chủ</a>
+                </div>
             </div>
 
             <div class="chat-window" id="chat-window" role="log" aria-live="polite">
                 <article class="bubble bubble-agent">
+                    <div class="mode-badge agent">🤖 Agent Mode</div>
                     <p>
                         Xin chào! Tôi là trợ lý du lịch Voyanta. Hãy cho tôi biết điểm đến, ngân sách,
                         thời gian chuyến đi và sở thích của bạn. Tôi có thể giúp ước tính khách sạn,
@@ -67,11 +190,51 @@
         const messageInput = document.getElementById("trip-message");
         const sendBtn = document.getElementById("send-btn");
 
-        function addBubble(text, type) {
+        // Mode selector elements
+        const modeSelector = document.getElementById("mode-selector");
+        const btnChatbot = document.getElementById("btn-chatbot");
+        const btnAgent = document.getElementById("btn-agent");
+        let currentMode = "agent";
+
+        function setMode(mode) {
+            currentMode = mode;
+            const isAgent = mode === "agent";
+
+            modeSelector.className = `mode-selector ${mode}-active just-switched`;
+            btnAgent.classList.toggle("active", isAgent);
+            btnAgent.setAttribute("aria-checked", isAgent);
+            btnChatbot.classList.toggle("active", !isAgent);
+            btnChatbot.setAttribute("aria-checked", !isAgent);
+
+            // Remove animation class after it finishes
+            setTimeout(() => modeSelector.classList.remove("just-switched"), 350);
+
+            // Show notification
+            const note = document.createElement("article");
+            note.className = "bubble bubble-trace";
+            note.innerHTML = `<p style="text-align:center;font-size:0.8rem;color:#94a3b8;">
+                Chuyển sang chế độ <strong>${isAgent ? "🤖 Agent (ReAct + Tools)" : "💬 Chatbot (Baseline)"}</strong>
+            </p>`;
+            chatWindow.appendChild(note);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        btnChatbot.addEventListener("click", () => { if (currentMode !== "chatbot") setMode("chatbot"); });
+        btnAgent.addEventListener("click", () => { if (currentMode !== "agent") setMode("agent"); });
+
+        function addBubble(text, type, mode) {
             const article = document.createElement("article");
             article.className = `bubble bubble-${type}`;
+
+            // Add mode badge for agent/chatbot responses
+            if (type === "agent" && mode) {
+                const badge = document.createElement("div");
+                badge.className = `mode-badge ${mode}`;
+                badge.textContent = mode === "agent" ? "🤖 Agent" : "💬 Chatbot";
+                article.appendChild(badge);
+            }
+
             const p = document.createElement("p");
-            // Support markdown-like bold and newlines
             p.innerHTML = text
                 .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                 .replace(/\n/g, "<br>");
@@ -110,37 +273,34 @@
             const message = messageInput.value.trim();
             if (!message) return;
 
-            // Show user message
             addBubble(message, "user");
             messageInput.value = "";
             setLoading(true);
 
-            // Show typing indicator
-            const typingBubble = addBubble("Đang suy nghĩ... 🤔", "agent typing");
+            const modeLabel = currentMode === "agent" ? "🤖 Agent đang suy luận..." : "💬 Chatbot đang trả lời...";
+            const typingBubble = addBubble(modeLabel, "agent typing");
 
             try {
                 const response = await fetch(API_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message }),
+                    body: JSON.stringify({ message, mode: currentMode }),
                 });
 
                 const data = await response.json();
-
-                // Remove typing indicator
                 typingBubble.remove();
 
                 if (data.error) {
-                    addBubble("❌ Error: " + data.error, "agent");
+                    addBubble("❌ Error: " + data.error, "agent", currentMode);
                 } else {
-                    // Show agent reply
-                    addBubble(data.reply, "agent");
-                    // Show trace (collapsible)
-                    addTraceBubble(data.traces);
+                    addBubble(data.reply, "agent", data.mode || currentMode);
+                    if (data.traces && data.traces.length > 0) {
+                        addTraceBubble(data.traces);
+                    }
                 }
             } catch (err) {
                 typingBubble.remove();
-                addBubble("❌ Không thể kết nối server. Hãy chắc chắn backend đang chạy trên port 8000.", "agent");
+                addBubble("❌ Không thể kết nối server. Hãy chắc chắn backend đang chạy trên port 8000.", "agent", currentMode);
             }
 
             setLoading(false);
