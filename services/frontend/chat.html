@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voyanta Agent Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="page-bg" aria-hidden="true"></div>
+
+    <header class="site-header">
+        <a class="brand" href="index.html">Voyanta</a>
+        <nav class="main-nav" aria-label="Main navigation">
+            <a href="index.html">Home</a>
+            <a href="index.html#features">Features</a>
+            <a href="index.html#plans">Plans</a>
+            <a href="chat.html">Chat</a>
+        </nav>
+    </header>
+
+    <main class="chat-page">
+        <section class="chat-shell" aria-label="Travel planner chat">
+            <div class="chat-header">
+                <div>
+                    <p class="eyebrow">Travel Planner Agent</p>
+                    <h1>Chat With Voyanta</h1>
+                </div>
+                <a class="btn btn-secondary" href="index.html">Back to Landing</a>
+            </div>
+
+            <div class="chat-window" id="chat-window" role="log" aria-live="polite">
+                <article class="bubble bubble-agent">
+                    <p>
+                        Hi! I am your travel planner agent. Tell me destination, budget, trip length, and your
+                        interests. I can help estimate hotel, food, attractions, and budget fit.
+                    </p>
+                </article>
+            </div>
+
+            <form class="chat-input-area" id="chat-form" action="#" method="get">
+                <label for="trip-message" class="sr-only">Message</label>
+                <input id="trip-message" name="message" type="text"
+                    placeholder="Example: 2 days in Hoi An, budget 2 million, culture focus"
+                    aria-label="Type your trip request" autocomplete="off" />
+                <button class="btn btn-primary" type="submit" id="send-btn">Send</button>
+            </form>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>Travel Planner</p>
+    </footer>
+
+    <script>
+        const API_URL = window.location.origin + "/api/chat";
+        const chatWindow = document.getElementById("chat-window");
+        const chatForm = document.getElementById("chat-form");
+        const messageInput = document.getElementById("trip-message");
+        const sendBtn = document.getElementById("send-btn");
+
+        function addBubble(text, type) {
+            const article = document.createElement("article");
+            article.className = `bubble bubble-${type}`;
+            const p = document.createElement("p");
+            // Support markdown-like bold and newlines
+            p.innerHTML = text
+                .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                .replace(/\n/g, "<br>");
+            article.appendChild(p);
+            chatWindow.appendChild(article);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return article;
+        }
+
+        function addTraceBubble(traces) {
+            if (!traces || traces.length === 0) return;
+            const article = document.createElement("article");
+            article.className = "bubble bubble-trace";
+            let html = '<details><summary>🔍 Agent Reasoning Trace (' + traces.length + ' steps)</summary><ol>';
+            traces.forEach(t => {
+                html += '<li>';
+                if (t.thought) html += '<em>Thought:</em> ' + t.thought.replace(/\n/g, '<br>') + '<br>';
+                if (t.action) html += '<strong>Action:</strong> ' + t.action + '<br>';
+                if (t.observation) html += '<span style="color:#6c757d">Observation:</span> ' + t.observation.replace(/\n/g, '<br>');
+                html += '</li>';
+            });
+            html += '</ol></details>';
+            article.innerHTML = html;
+            chatWindow.appendChild(article);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function setLoading(loading) {
+            sendBtn.disabled = loading;
+            sendBtn.textContent = loading ? "Thinking..." : "Send";
+            messageInput.disabled = loading;
+        }
+
+        chatForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Show user message
+            addBubble(message, "user");
+            messageInput.value = "";
+            setLoading(true);
+
+            // Show typing indicator
+            const typingBubble = addBubble("Thinking... 🤔", "agent typing");
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message }),
+                });
+
+                const data = await response.json();
+
+                // Remove typing indicator
+                typingBubble.remove();
+
+                if (data.error) {
+                    addBubble("❌ Error: " + data.error, "agent");
+                } else {
+                    // Show agent reply
+                    addBubble(data.reply, "agent");
+                    // Show trace (collapsible)
+                    addTraceBubble(data.traces);
+                }
+            } catch (err) {
+                typingBubble.remove();
+                addBubble("❌ Could not connect to server. Make sure backend is running on port 8000.", "agent");
+            }
+
+            setLoading(false);
+            messageInput.focus();
+        });
+    </script>
+</body>
+
+</html>
